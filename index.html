@@ -1,0 +1,353 @@
+<html>
+
+<head>
+    <title>tiles</title>
+    <meta http-equiv="imagetoolbar" content="no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <style type="text/css">
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+        }
+
+        body {
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+        }
+
+        #map {
+            position: absolute;
+            height: 100%;
+            width: 100%;
+        }
+
+        #slider {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+    </style>
+    <link rel="stylesheet" href="https://openlayers.org/en/v3.20.1/css/ol.css" type="text/css">
+    <script src="https://openlayers.org/en/v3.20.1/build/ol.js" type="text/javascript"></script>
+		<script src="ol-layerswitcher.js" type="text/javascript"></script>
+		<link rel="stylesheet" href="ol-layerswitcher.css" type="text/css">
+		<link rel="stylesheet" href="popup.css" type="text/css">
+</head>
+
+<body>
+    <div id="map" class="map">
+	  <label for="speed">
+	  speed:&nbsp;
+	  <input id="speed" type="range" min="1" max="20" step="1" value="5">
+	  <button id="start-animation">轨迹回放</button>
+	  </label>
+	</div>
+	
+	<div id="popup" class="ol-popup">
+	  <a href="#" id="popup-closer" class="ol-popup-closer"></a>
+	  <div id="popup-content"></div>
+	</div>	
+
+    <script type="text/javascript">
+			
+			//此输入经纬度格式为[纬度，经度]
+       var locations = [[22.752816666666664,114.5928],
+		[22.75267,114.592305],
+		[22.751009999999997,114.59071166666666],
+		[22.750301666666666,114.58907833333333],
+		[22.749793333333333,114.58766499999999],
+		[22.749326666666667,114.58661666666667],
+		[22.749011666666668,114.58571166666667],
+		[22.747678333333337,114.58552333333334],
+		[22.747383333333333,114.58455833333333],
+		[22.74733,114.58450666666667],
+		[22.746783333333333,114.58322833333335],
+		[22.746374999999997,114.58229833333334],
+		[22.746355,114.58224999999999],
+		[22.74638,114.58219833333332],
+		[22.746959999999998,114.58189499999999],
+		[22.747593333333333,114.58256666666666],
+		[22.748145,114.583955],
+		[22.748263333333338,114.58434833333334],
+		[22.748863333333333,114.58552333333334],
+		[22.749793333333333,114.58778333333333],
+		[22.749943333333333,114.58820833333333],
+		[22.751101666666667,114.588430],
+		[22.751281666666667,114.58879833333334],
+		[22.751718333333333,114.589755],
+		[22.752104999999997,114.59078166666669],
+		[22.752130000000005,114.590800],
+		[22.752571666666668,114.59181166666667],
+		[22.752546666666664,114.59195999999999], 
+		[22.752541666666667,114.59214833333],
+    ];
+	   
+
+// OpenLayers uses [lon, lat], not [lat, lon]
+//一般拿到gps坐标为[纬度，经度]，而在oL里格式为[经度，纬度]
+ 		locations.map(function(l) {
+ 		  return l.reverse();
+ 		});
+
+		//从locations创建line
+		var route = new ol.geom.LineString(locations)
+			.transform('EPSG:4326', 'EPSG:3857');
+				
+		var routeCoords = route.getCoordinates();
+		var routeLength = routeCoords.length;
+
+		//轨迹多段线
+		var routeFeature = new ol.Feature({
+		  type: 'route',
+		  geometry: route,
+		  name:'you clicked routeFeature'
+		});
+		
+		//此marker为轨迹回放的动点icon
+		var geoMarker = new ol.Feature({
+		  type: 'geoMarker',
+		  geometry: new ol.geom.Point(routeCoords[0]),
+		  name:'you clicked geoMarker'
+		});
+		
+		//起点
+		var startMarker = new ol.Feature({
+		  type: 'icon',
+		  geometry: new ol.geom.Point(routeCoords[0]),
+		  name:'you clicked startMarker'
+		});
+		
+		//终点
+		var endMarker = new ol.Feature({
+		  type: 'icon',
+		  geometry: new ol.geom.Point(routeCoords[routeLength - 1]),
+		  name:'you clicked endMarker'
+		});
+		
+		//对中间点进行遍历赋值
+		var placeSource = new ol.source.Vector({});
+		for (var i =1;i<routeLength - 1;i++){
+			var placeMarker = new ol.Feature({
+		  type: 'icon',
+		  geometry: new ol.geom.Point(routeCoords[i]),
+		  name:'you clicked placeMarker'
+		});
+			placeSource.addFeature(placeMarker);
+		}
+		
+		//定义矢量图层样式
+		var styles = {
+		  'route': new ol.style.Style({
+			stroke: new ol.style.Stroke({
+			  width: 6,
+			  color: [237, 212, 0, 0.8]
+			})
+		  }),
+		  'icon': new ol.style.Style({
+			image: new ol.style.Icon({
+			  anchor: [0.5, 1],
+			  src: 'https://openlayers.org/en/v3.20.1/examples/data/icon.png'
+			})
+		  }),
+		  'geoMarker': new ol.style.Style({
+			image: new ol.style.Circle({
+			  radius: 7,
+			  snapToPixel: false,
+			  fill: new ol.style.Fill({
+				color: 'black'
+			  }),
+			  stroke: new ol.style.Stroke({
+				color: 'white',
+				width: 2
+			  })
+			})
+		  })
+		};
+
+		var animating = false;
+		var speed, now;
+		var speedInput = document.getElementById('speed');
+		var startButton = document.getElementById('start-animation');
+
+				
+		//图层设置
+		var tian_di_tu_road_layer = new ol.layer.Tile({
+			title: "天地图路网",
+			source: new ol.source.XYZ({
+				url: "http://t4.tianditu.com/DataServer?T=vec_w&x={x}&y={y}&l={z}"
+			})
+		});
+		var tian_di_tu_annotation = new ol.layer.Tile({
+			title: "天地图文字标注",
+			source: new ol.source.XYZ({
+				url: 'http://t3.tianditu.com/DataServer?T=cva_w&x={x}&y={y}&l={z}'
+			})
+		});
+		var googledom = new ol.layer.Tile({
+			title:"Google卫星影像",
+			source: new ol.source.XYZ({
+				url: 'http://mt1.google.cn/vt/lyrs=s&hl=zh-CN&x={x}&y={y}&z={z}'
+			})
+		})
+		var cadtiles = new ol.layer.Tile({
+			title:"石油厂区平面图",
+			source: new ol.source.XYZ({
+				url: '{z}/{x}/{y}.png',
+			})
+		})
+		
+		//取popup等。
+		var container = document.getElementById('popup');
+		var content = document.getElementById('popup-content');
+		var closer = document.getElementById('popup-closer');
+
+
+		//单击，关闭popup
+		closer.onclick = function() {
+		  overlay.setPosition(undefined);
+		  closer.blur();
+		  return false;
+		};
+
+		//创建叠加层，展示popup
+		var overlay = new ol.Overlay({
+		  element: container,
+		  autoPan: true,
+		  autoPanAnimation: {
+			duration: 250
+		  }
+		});
+		
+		//创建起始点、轨迹等的矢量图层
+		var vectorLayer = new ol.layer.Vector({
+		  source: new ol.source.Vector({
+			features: [routeFeature, geoMarker, startMarker, endMarker]
+		  }),
+		  style: function(feature) {
+			// hide geoMarker if animation is active
+			if (animating && feature.get('type') === 'geoMarker') {
+			  return null;
+			}
+			return styles[feature.get('type')];
+		  }
+		});
+		
+		//创建中间点的矢量图层
+		var placeLayer = new ol.layer.Vector({
+		  source: placeSource,
+			style: function(source) {
+			// hide geoMarker if animation is active
+			return styles[source.get('type')];
+		  }
+		});
+		
+		
+		//创建地图
+		var map = new ol.Map({
+		  target: document.getElementById('map'),
+		  loadTilesWhileAnimating: true,
+		  view: new ol.View(),
+		  layers: [
+			googledom,
+			vectorLayer,
+			tian_di_tu_annotation,
+			cadtiles,
+			placeLayer
+		  ],
+		  overlays: [overlay],
+		});
+		map.addLayer(vectorLayer);
+		
+		//图层选择器代码，必填
+		var layerSwitcher = new ol.control.LayerSwitcher({
+			tipLabel: '切换图层'
+		});
+		map.addControl(layerSwitcher);
+		
+		//初始视图定位
+		map.getView().fit(
+			vectorLayer.getSource().getExtent(), map.getSize(),
+			{padding: [30, 5, 5, 5]});
+		var center = map.getView().getCenter();
+
+		var moveFeature = function(event) {
+		  var vectorContext = event.vectorContext;
+		  var frameState = event.frameState;
+
+		  if (animating) {
+			var elapsedTime = frameState.time - now;
+			// here the trick to increase speed is to jump some indexes
+			// on lineString coordinates
+			var index = Math.round(speed * elapsedTime / 1000);
+
+			if (index >= routeLength) {
+			  stopAnimation(true);
+			  return;
+			}
+
+			var currentPoint = new ol.geom.Point(routeCoords[index]);
+			var feature = new ol.Feature(currentPoint);
+			vectorContext.drawFeature(feature, styles.geoMarker);
+		  }
+		  // tell OL3 to continue the postcompose animation
+		  map.render();
+		};
+
+		function startAnimation() {
+		  if (animating) {
+			stopAnimation(false);
+		  } else {
+			animating = true;
+			now = new Date().getTime();
+			speed = speedInput.value;
+			startButton.textContent = '停止回放';
+			// hide geoMarker
+			geoMarker.setStyle(null);
+			// just in case you pan somewhere else
+			map.getView().setCenter(center);
+			map.on('postcompose', moveFeature);
+			map.render();
+		  }
+		}
+
+
+		/**
+		 * @param {boolean} ended end of animation.
+		 */
+		function stopAnimation(ended) {
+		  animating = false;
+		  startButton.textContent = '轨迹回放';
+
+		  // if animation cancelled set the marker at the beginning
+		  var coord = ended ? routeCoords[routeLength - 1] : routeCoords[0];
+		  /** @type {ol.geom.Point} */
+		  (geoMarker.getGeometry())
+		  .setCoordinates(coord);
+		  //remove listener
+		  map.un('postcompose', moveFeature);
+		}
+
+		startButton.addEventListener('click', startAnimation, false);
+		
+		map.on('click', function (evt) {
+            var feature = map.forEachFeatureAtPixel(evt.pixel,
+                function (feature, layer) {
+                    return feature;
+                });
+            if (feature) {
+                overlay.setPosition(evt.coordinate);
+                content.innerHTML = feature.get('name');
+            } 
+        });
+		map.on('pointermove', function(evt) {
+		map.getTargetElement().style.cursor = map.hasFeatureAtPixel(evt.pixel) ? 'pointer' : '';
+		});
+    </script>
+</body>
+
+</html>
